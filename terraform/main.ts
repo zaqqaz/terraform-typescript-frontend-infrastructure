@@ -1,68 +1,75 @@
 import { Construct } from 'constructs';
 import { App, TerraformStack } from 'cdktf';
-import {
-    AwsProvider,
-    DataAwsIamPolicyDocument,
-    Route53Record,
-    Route53Zone,
-    S3Bucket,
-} from "./.gen/providers/aws";
-import { S3Backend } from "cdktf/lib/backends";
+import { withBackend } from "./src/backend";
+import { createProviders } from "./src/providers";
+import { createS3 } from "./src/s3";
+import { createOriginAccessIdentity, createCloudfront } from "./src/cloudfront";
+import { createAcmCertificate, createAcmCertificateValidation } from "./src/acm";
+import { createRoute53, createRoute53CertificateValidation } from "./src/route53";
+import { createDeploy } from "./src/deploy";
 
-const domainHost = "ux.by";
-const domainName = "test-typescript.ux.by";
+const domainHost = process.env.DomainHost!;
+const domainName = process.env.DomainName!;
 
-class MyStack extends TerraformStack {
+class Infrastructure extends TerraformStack {
     constructor(scope: Construct, name: string) {
         super(scope, name);
 
-        new AwsProvider(this, 'aws', {
-            region: 'eu-central-1'
+        const providers = createProviders({ stack: this });
+
+        const originAccessIdentity = createOriginAccessIdentity({ stack: this });
+
+        const { bucket } = createS3({
+            stack: this,
+            provider: providers.default,
+            originAccessIdentity,
+            domainName,
         });
 
-        new DataAwsIamPolicyDocument(this, 'bucket', {
-            statement: [{
-                actions: [`s3:GetObject`],
-                resources: [`arn:aws:s3:::${domainName}/*`],
-            }]
+        const acmCertificate = createAcmCertificate({
+            stack: this,
+            provider: providers.acm,
+            domainHost,
         });
 
-        const bucket = new S3Bucket(this, 'resource', {
-            bucket: domainName,
-            acl: "public-read",
-            website: [{
-                indexDocument: "index.html",
-                errorDocument: "error.html"
-            }]
+        const cloudfrontDistribution = createCloudfront({
+            stack: this,
+            domainName,
+            originAccessIdentity,
+            s3Bucket: bucket,
+            acmCertificate,
         });
 
-        const route53Zone = new Route53Zone(this, 'zone', {
-            name: domainHost
+        const {
+            route53Zone,
+        } = createRoute53({
+            stack: this,
+            domainHost,
+            domainName,
+            cloudfrontDistribution
         });
 
-        new Route53Record(this, domainHost, {
-            zoneId: route53Zone.zoneId,
-            name: domainName,
-            type: 'A',
+        const route53ValidationRecord = createRoute53CertificateValidation({
+            stack: this,
+            route53Zone,
+            acmCertificate
+        });
 
-            alias: [
-                {
-                    evaluateTargetHealth: true,
-                    name: bucket.websiteDomain!,
-                    zoneId: bucket.hostedZoneId!
-                }
-            ]
-        })
+        createAcmCertificateValidation({
+            stack: this,
+            provider: providers.acm,
+            route53Record: route53ValidationRecord,
+            certificate: acmCertificate
+        });
 
+        createDeploy({
+            stack: this,
+            bucket,
+        });
     }
 }
 
 const app = new App();
-const stack = new MyStack(app, 'terraform');
-app.synth();
+withBackend(new Infrastructure(app, 'terraform'));
 
-new S3Backend(stack, {
-    bucket: "terraform.ux.by",
-    key: "terraform-typescript-frontend-infrastructure",
-    region: "eu-central-1"
-});
+app.synth();
