@@ -7,9 +7,7 @@ import { createOriginAccessIdentity, createCloudfront } from "./src/cloudfront";
 import { createAcmCertificate, createAcmCertificateValidation } from "./src/acm";
 import { createRoute53, createRoute53CertificateValidation } from "./src/route53";
 import { createDeploy } from "./src/deploy";
-
-const domainHost = process.env.DomainHost!;
-const domainName = process.env.DomainName!;
+import { configuration } from "./src/configuration";
 
 class Infrastructure extends TerraformStack {
     constructor(scope: Construct, name: string) {
@@ -23,18 +21,18 @@ class Infrastructure extends TerraformStack {
             stack: this,
             provider: providers.default,
             originAccessIdentity,
-            domainName,
+            domainName: configuration.DomainName,
         });
 
         const acmCertificate = createAcmCertificate({
             stack: this,
             provider: providers.acm,
-            domainHost,
+            domainHost: configuration.DomainHost,
         });
 
         const cloudfrontDistribution = createCloudfront({
             stack: this,
-            domainName,
+            domainName: configuration.DomainName,
             originAccessIdentity,
             s3Bucket: bucket,
             acmCertificate,
@@ -44,8 +42,8 @@ class Infrastructure extends TerraformStack {
             route53Zone,
         } = createRoute53({
             stack: this,
-            domainHost,
-            domainName,
+            domainHost: configuration.DomainHost,
+            domainName: configuration.DomainName,
             cloudfrontDistribution
         });
 
@@ -65,6 +63,7 @@ class Infrastructure extends TerraformStack {
         createDeploy({
             stack: this,
             bucket,
+            unzipLambdaName: configuration.UnzipLambdaName
         });
     }
 }

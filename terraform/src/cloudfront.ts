@@ -30,8 +30,8 @@ export function createCloudfront(props: CreateCloudfrontProps) {
         customErrorResponse: [
             {
                 errorCode: 404,
-                responseCode: 202,
-                responsePagePath: 'index.html'
+                responseCode: 200,
+                responsePagePath: '/index.html'
             }
         ],
         defaultCacheBehavior: [

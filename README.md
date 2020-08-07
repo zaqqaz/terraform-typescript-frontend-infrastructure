@@ -18,7 +18,7 @@ npm i
 
 - Build typescript and provide DomainHost and DomainName (can be equal, or DomainName can be a subdomain)
 ```
-DomainHost="domain.com" DomainName="test.domain.com" npm run go
+DomainHost="domain.com" DomainName="test.domain.com" BakendBucket="terraform.domain.com" BackendKey="terraform-typescript-frontend-infrastructure.json" UnzipLambdaName="unzipTTFI" npm run go
 ```
 
 - Run terraform

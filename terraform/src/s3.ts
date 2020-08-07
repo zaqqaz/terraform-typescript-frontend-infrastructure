@@ -55,7 +55,7 @@ export function createS3(props: CreateS3Props) {
             {
                 actions: [`s3:ListBucket`],
                 resources: [
-                    `${bucket.arn}/*`
+                    bucket.arn!,
                 ],
                 principals: [{
                     type: "AWS",
